@@ -25,17 +25,20 @@ def show_image(image):
     plt.show()
 
 def windowed_image(image, window):
-    r1 = window[0][0]
-    r2 = window[1][0]
-    c1 = window[0][1]
-    c2 = window[1][1]
     windowed_image = copy.deepcopy(image) 
-    windowed_image[skimage.draw.line(r1, c2, r2, c2)] =  [153, 20, 0]
-    windowed_image[skimage.draw.line(r1, c1 , r2, c1)]  =  [153, 20, 0]
-    windowed_image[skimage.draw.line(r2, c1 , r2, c2)] =  [153, 20, 0]
-    windowed_image[skimage.draw.line(r1, c1, r1, c2)] =  [153, 20, 0]
+    inside_one
+    #c2 = window[1][1]
+    #r1 = window[0][0]
+    #r2 = window[1][0]
+    #c1 = window[0][1]
+    #windowed_image[skimage.draw.line(r1, c2, r2, c2)] =  [153, 20, 0]
+    #windowed_image[skimage.draw.line(r1, c1 , r2, c1)]  =  [153, 20, 0]
+    #windowed_image[skimage.draw.line(r2, c1 , r2, c2)] =  [153, 20, 0]
+    #windowed_image[skimage.draw.line(r1, c1, r1, c2)] =  [153, 20, 0]
+    windowed_image = copy.deepcopy(image) 
+    windowed_image[skimage.draw.rectangle_perimeter(start=window[0], end=window[1]), clip=image.shape] =  [153, 20, 0]
+    windowed_image[skimage.draw.rectangle_perimeter(start=window[0], end=window[1]), clip=image.shape] =  [153, 20, 0]
     show_image(windowed_image)
-
     return windowed_image
 
 
@@ -324,7 +327,7 @@ while True:
         kmeans = KMeans(n_clusters=2, random_state=10, n_init="auto").fit(X)
         print(kmeans.labels_)
 
-       for shape, window_ in window_dictionary.items():
+        for shape, window_ in window_dictionary.items():
             if kmeans.labels_[shape-1] == 1:
                 print(window_)
                 windowed_display_image = skimage.util.img_as_uint(scikit_skeleton)
