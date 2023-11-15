@@ -20,6 +20,25 @@ from PIL import Image, ImageGrab
 
 WIDTH = 700 
 
+def show_image(image):
+    skimage.io.imshow(image)
+    plt.show()
+
+def windowed_image(image, window):
+    r1 = window[0][0]
+    r2 = window[1][0]
+    c1 = window[0][1]
+    c2 = window[1][1]
+    windowed_image = copy.deepcopy(image) 
+    windowed_image[skimage.draw.line(r1, c2, r2, c2)] =  [153, 20, 0]
+    windowed_image[skimage.draw.line(r1, c1 , r2, c1)]  =  [153, 20, 0]
+    windowed_image[skimage.draw.line(r2, c1 , r2, c2)] =  [153, 20, 0]
+    windowed_image[skimage.draw.line(r1, c1, r1, c2)] =  [153, 20, 0]
+    show_image(windowed_image)
+
+    return windowed_image
+
+
 
 def does_segment_contain_point(segment, point):
     s1 = segment[0]
@@ -50,13 +69,15 @@ def draw_borders(image, array_of_borders):
     height = image.shape[0]
     slices = list()
     for border in array_of_borders:
-        slice = math.floor(border*width)
-        slices.append(slice)
+        try:
+            slice = math.floor(border*width)
+            slices.append(slice)
+        except:
+            print()
     
     for slice in slices:
         rr, cc = skimage.draw.line(0, slice, height-1, slice)
         image[rr, cc] = 34 
-    
 
 def return_normalize_display_image(image):
     desired_width = WIDTH
@@ -66,6 +87,15 @@ def return_normalize_display_image(image):
     desired_height =  math.floor(image_ratio*desired_width)
     desired_image = skimage.transform.resize(image, (desired_height, desired_width), anti_aliasing=True) 
     desired_image = skimage.util.img_as_ubyte(desired_image)
+    return desired_image
+
+def return_normalize_display_image_rgb(image):
+    desired_width = WIDTH
+    image_width = image.shape[1]
+    image_height = image.shape[0]
+    image_ratio = image_height/image_width
+    desired_height =  math.floor(image_ratio*desired_width)
+    desired_image = skimage.transform.resize(image, (desired_height, desired_width), anti_aliasing=False) 
     return desired_image
 
 def get_boundries(shapes_lookup: dict):
@@ -115,9 +145,13 @@ def parse_shapes(image, shape_lookup):
                 if pixel in traversed:
                     continue
                 traversed.add(pixel)
-                if image[i][j] == True:
-                    to_search.add(pixel)
-                    shape_lookup[pixel] = shape_number
+                try:
+                    if image[i][j] == True:
+                        to_search.add(pixel)
+                        shape_lookup[pixel] = shape_number
+                except:
+                    print()
+
 
 def surrounding_pixels(pixel):
     r, c = pixel
@@ -141,7 +175,7 @@ tab_contents_grab_word = [
    justification='center'),
    psg.Button("Load Image")],
 
-   [psg.Radio("Invert", "invert_radio", key="isinvert"), psg.Radio("Default", "invert_radio", key="isinvert")],
+   [psg.Radio("K-Mean Filter", "filter_radio", key="-K-MEAN-"), psg.Radio("No Filter", "filter_radio", key="-K-MEAN-")],
 
    [psg.Slider(range=(1,3), default_value=1,
    expand_x=True, enable_events=True,
@@ -165,10 +199,12 @@ parse_letters_previous = psg.Button("Previous")
 parse_letters_insert = psg.Button("Insert After") 
 parse_letters_previous = psg.Button("Previous") 
 parse_letters_show_all = psg.Button("Show All") 
-parse_letters_border_number = psg.Text(text='1')
+parse_letters_move = psg.Button("Move To Slider") 
+parse_letters_show_current = psg.Button("Show Current") 
+parse_letters_border_number = psg.Text(text='1', key ="-BOUND-NUM-")
 parse_letters_border_slider = psg.Slider(range=(1,315), default_value=1,
    expand_x=True, enable_events=True,
-   orientation='horizontal', key='-SCALE-')
+   orientation='horizontal', key='-BOUND-SCALE-')
 
 tab_contents_parse_letters = [
    [psg.Radio("Filter", "invert_radio", key="isinvert"), psg.Radio("No Filter", "invert_radio", key="isinvert")],
@@ -184,7 +220,7 @@ tab_contents_parse_letters = [
    key="-IMAGE-BOUNDRIES-")],
 
    [parse_letters_border_slider],
-   [parse_letters_previous, parse_letters_border_number, parse_letters_next, parse_letters_insert, parse_letters_show_all]
+   [parse_letters_previous, parse_letters_border_number, parse_letters_next, parse_letters_insert, parse_letters_show_all, parse_letters_show_current, parse_letters_move]
 ]
 
 layout = [[
@@ -228,20 +264,86 @@ while True:
       word_loaded = True
 
    if event == "Skeletonize" and word_loaded is True:
-      skeleton_bytes = io.BytesIO()
+      #Create Skeleton
+      skeleton_bytes = io.BytesIO() 
       scikit_gray_image = skimage.color.rgb2gray(scikit_image)
       scikit_skeleton = skeletonize(invert(scikit_gray_image), method="zhang")
-      display_image = skimage.util.img_as_ubyte(scikit_skeleton)
+
+      #Display Skeleton
+      display_image = skimage.util.img_as_ubyte(scikit_skeleton) 
       display_image = return_normalize_display_image(display_image) 
       skimage.io.imsave("skeleton_temp.png", display_image)
       window["-IMAGE-SKELETON-"].update("skeleton_temp.png")
+
+      #Switch Tab
       window['tabgroup'].Widget.select(1)
+
+      #Parse Shapes
       shape_dictionary = dict()
       parse_shapes(scikit_skeleton, shape_dictionary)
+
+      if values["-K-MEAN-"] is True:
+        window_dictionary = dict()
+        area_dictionary = dict()
+        min_r = dict()
+        max_r = dict()
+        max_c = dict()
+        min_c = dict()
+
+        for shape in set(shape_dictionary.values()):
+            min_r[shape] = float("inf") 
+            max_r[shape] = float("-inf")
+            min_c[shape] = float("inf")
+            max_c[shape] = float("-inf")
+        
+        for pixel, shape in shape_dictionary.items():
+            row = pixel[0]
+            column = pixel[1]
+
+            min_r[shape] = min(row, min_r[shape])
+            max_r[shape] = max(row, max_r[shape])
+
+            min_c[shape] = min(column, min_c[shape])
+            max_c[shape] = max(column, max_c[shape])
+        
+        for shape in set(shape_dictionary.values()):
+            window_dictionary[shape] = ((min_r[shape], min_c[shape]), (max_r[shape], max_c[shape]))
+            area_dictionary[shape] = (abs(min_r[shape]-max_r[shape])*abs(max_c[shape]-max_r[shape]))
+
+        for shape in set(shape_dictionary.values()):
+            print(window_dictionary[shape])
+            print(area_dictionary[shape])
+
+        temp_array = list()
+
+        for row in area_dictionary.items():
+            print(row[0])
+            temp_array.append([row[1], 0])
+
+        X = np.array(temp_array)
+        kmeans = KMeans(n_clusters=2, random_state=10, n_init="auto").fit(X)
+        print(kmeans.labels_)
+
+       for shape, window_ in window_dictionary.items():
+            if kmeans.labels_[shape-1] == 1:
+                print(window_)
+                windowed_display_image = skimage.util.img_as_uint(scikit_skeleton)
+                windowed_display_image = skimage.color.gray2rgb(windowed_display_image)
+                windowed_display_image = windowed_image(windowed_display_image, window_) 
+                show_image(windowed_display_image)
+                windowed_display_image = return_normalize_display_image_rgb(windowed_display_image) 
+                show_image(windowed_display_image)
+
+                plt.imsave("test.png", windowed_display_image)
+                #skimage.io.imsave("test.png", windowed_display_image)
+                window["-IMAGE-SKELETON-"].update("test.png")
+                breakpoint()
+            
+             
+        #Calculate boundries for windows
       boundries = get_boundries(shape_dictionary)
       skeleton_created = True
       ratio_boundries = list()
-
       boundries = list(boundries.items())
 
       for shape_r in boundries:
@@ -258,9 +360,9 @@ while True:
                     boundries.remove(shape_r)
                 else:
                     boundries.remove(shape_c)
-    
       boundries = sorted(boundries, key=lambda tup: tup[1][0])
-    
+
+
       for first, second in zip(boundries, boundries[1:]):
         first_shape = first[0]
         second_shape = second[0]
@@ -274,14 +376,51 @@ while True:
         print(first_shape, second_shape, left_bound, right_bound, space_bound)
         ratio_boundries.append(space_bound)
 
+      #Draw Boundry
       boundry_image = skimage.io.imread("borderdisplay.png")
       draw_borders(boundry_image, ratio_boundries)
       skimage.io.imsave("bound_temp.png", boundry_image)
       window["-IMAGE-BOUNDRIES-"].update("bound_temp.png")
+    
+   if event == "Next" and skeleton_created is True:
+    number = int(window["-BOUND-NUM-"].get())
+    if number < len(ratio_boundries):
+        window["-BOUND-NUM-"].update(number + 1)
+
+   if event == "Previous" and skeleton_created is True:
+    number = int(window["-BOUND-NUM-"].get())
+    if number > 1:
+        window["-BOUND-NUM-"].update(number - 1)
+
+   if event == "Show Current" and skeleton_created is True:
+        number = int(window["-BOUND-NUM-"].get())
+        boundry_image = skimage.io.imread("borderdisplay.png")
+        draw_borders(boundry_image, [ratio_boundries[number-1]])
+        skimage.io.imsave("bound_temp.png", boundry_image)
+        window["-IMAGE-BOUNDRIES-"].update("bound_temp.png")
+        window["-BOUND-SCALE-"].update(math.ceil(ratio_boundries[number-1]*315))
+
+   if event == "Insert After" and skeleton_created is True:
+        number = int(window["-BOUND-NUM-"].get())
+        ratio_boundries.insert(number, values["-BOUND-SCALE-"]/315)
+        ratio_boundries = sorted(ratio_boundries)
+
+   if event == "Move To Slider" and skeleton_created is True:
+        number = int(window["-BOUND-NUM-"].get())
+        ratio_boundries[number-1] = values["-BOUND-SCALE-"]/315
+        boundry_image = skimage.io.imread("borderdisplay.png")
+        draw_borders(boundry_image, [ratio_boundries[number-1]])
+        skimage.io.imsave("bound_temp.png", boundry_image)
+        window["-IMAGE-BOUNDRIES-"].update("bound_temp.png")
+        window["-BOUND-SCALE-"].update(math.ceil(ratio_boundries[number-1]*315))
+        ratio_boundries = sorted(ratio_boundries)
+
+   if event == "Show All" and skeleton_created is True:
+        boundry_image = skimage.io.imread("borderdisplay.png")
+        draw_borders(boundry_image, ratio_boundries)
+        skimage.io.imsave("bound_temp.png", boundry_image)
+        window["-IMAGE-BOUNDRIES-"].update("bound_temp.png")
 
    if event == '-SL-':
       window['-TEXT-'].update(font=('Arial Bold', int(values['-SCALE-'])))
-
-
-
 window.close()
