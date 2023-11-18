@@ -98,7 +98,7 @@ def return_normalize_display_image_rgb(image):
     skimage.io.imsave("temp.bmp", image )
     show_image(image)
     desired_image = Image.open("temp.bmp") 
-    #desired_image = skimage.transform.resize(image, (desired_height, desired_width), preserve_range=True,anti_aliasing=False) 
+    #desired_image = sdkimage.transform.resize(image, (desired_height, desired_width), preserve_range=True,anti_aliasing=False) 
     desired_image.resize((desired_width, desired_height))
     show_image(desired_image)
     return desired_image
@@ -341,7 +341,7 @@ while True:
                 breakpoint()
             
              
-        #Calculate boundries for windows
+      #Calculate boundries for windows
       boundries = get_boundries(shape_dictionary)
       skeleton_created = True
       ratio_boundries = list()
@@ -362,7 +362,6 @@ while True:
                 else:
                     boundries.remove(shape_c)
       boundries = sorted(boundries, key=lambda tup: tup[1][0])
-
 
       for first, second in zip(boundries, boundries[1:]):
         first_shape = first[0]

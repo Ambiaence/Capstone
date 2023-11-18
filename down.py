@@ -68,7 +68,6 @@ for letter in letters:
         letter_image = skimage.transform.resize(letter_image, (8,8), anti_aliasing=False)
         letter_images.append((letter, ratio, letter_image))
 
-
 data = list()
 for letter in letter_images:
     character, ratio, image = letter
