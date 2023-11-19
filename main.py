@@ -37,6 +37,8 @@ def windowed_image(image, window):
     windowed_image[(rr, cc)] =  [50, 168, 113]
     return windowed_image
 
+    
+
 def does_segment_contain_point(segment, point):
     s1 = segment[0]
     s2 = segment[1]
@@ -102,6 +104,36 @@ def return_normalize_display_image_rgb(image):
     desired_image.resize((desired_width, desired_height))
     show_image(desired_image)
     return desired_image
+
+def draw_boundries(boundires, image):
+    width = image.shape[1]
+    height = image.shape[0]
+
+    pairs = list()
+
+    for boundrie in boundires:
+        number, two_tuple = boundrie
+        left, right = two_tuple
+        try:
+            left = math.floor(left*width)
+            right = math.floor(right*width)
+        except:
+            continue
+        pairs.append((left,right))
+
+    for pair in pairs:
+        left, right = pair
+        rr, cc = skimage.draw.line(0, left, height-1, left)
+        image[rr, cc] = 34 
+        rr, cc = skimage.draw.line(0, right, height-1, right)
+        image[rr, cc] = 34 
+    
+        for middle in range(left+1, right-1):
+            rr, cc = skimage.draw.line(0, middle, height-1, middle)
+            image[rr, cc] = 88  
+
+    
+
 
 def get_boundries(shapes_lookup: dict):
     mins = dict()
@@ -172,7 +204,6 @@ def surrounding_pixels(pixel):
             pixels.append(tuple([r + i, c + j]))
     return pixels
 
-
 tab_contents_grab_word = [
    [psg.Text(text='English Reading Buddy',
    font=('Arial Bold', 16),
@@ -204,16 +235,16 @@ parse_letters_previous = psg.Button("Previous")
 parse_letters_insert = psg.Button("Insert After") 
 parse_letters_previous = psg.Button("Previous") 
 parse_letters_show_all = psg.Button("Show All") 
+parse_letters_show_all = psg.Button("Split Current") 
 parse_letters_move = psg.Button("Move To Slider") 
 parse_letters_show_current = psg.Button("Show Current") 
+parse_letters_image_flip = psg.Button("Switch Image")
 parse_letters_border_number = psg.Text(text='1', key ="-BOUND-NUM-")
 parse_letters_border_slider = psg.Slider(range=(1,315), default_value=1,
    expand_x=True, enable_events=True,
    orientation='horizontal', key='-BOUND-SCALE-')
 
 tab_contents_parse_letters = [
-   [psg.Radio("Filter", "invert_radio", key="isinvert"), psg.Radio("No Filter", "invert_radio", key="isinvert")],
-
    [psg.Image('nowordyet.png',
    expand_x=True,
    expand_y=True,
@@ -225,13 +256,34 @@ tab_contents_parse_letters = [
    key="-IMAGE-BOUNDRIES-")],
 
    [parse_letters_border_slider],
-   [parse_letters_previous, parse_letters_border_number, parse_letters_next, parse_letters_insert, parse_letters_show_all, parse_letters_show_current, parse_letters_move]
+   [psg.Button("Read Letter")],
+   [parse_letters_previous, parse_letters_border_number, parse_letters_next, parse_letters_insert, parse_letters_show_all, parse_letters_image_flip, parse_letters_show_current, parse_letters_move]
 ]
 
+tab_contents_read_letters_row_one = [
+  psg.Slider(range=(10, 30), default_value=12,
+   expand_x=True, enable_events=True,
+   orientation='vertical', key='-SLIDER-PARSE-TOP-'),
+
+   psg.Image('noletteryet.png',
+   expand_x=True,
+   expand_y=True,
+   key="-LETTER-IMAGE-"),
+
+  psg.Slider(range=(1, 100), default_value=12,
+   expand_x=True, enable_events=True,
+   orientation='vertical', key='-SLIDER-PARSE-BOTTOM-'),
+]
+
+tab_contents_read_letters = [
+   tab_contents_read_letters_row_one,
+   [psg.Button("Modify Left Boundrie"), psg.Button("Modify Right Boundrie")]
+]
 layout = [[
     psg.TabGroup([
         [psg.Tab("Grab Word", tab_contents_grab_word),
-        psg.Tab("Figure Out Letters ", tab_contents_parse_letters) ]
+        psg.Tab("Borders", tab_contents_parse_letters),
+         psg.Tab("Read Letters", tab_contents_read_letters)]
     ], key = "tabgroup")]
 ]
       
@@ -239,7 +291,9 @@ word_bytes = io.BytesIO()
 skeleton_bytes = io.BytesIO()
 shape_dictionary = dict()
 
+mutable_boundrie = "left"
 word_loaded = False
+is_display_skeleton = True
 skeleton_created = False
 window = psg.Window('HelloWorld', layout, size=(715,WIDTH), keep_on_top=True)
 
@@ -267,6 +321,23 @@ while True:
       skimage.io.imsave("word_temp.png", display_image)
       window["-IMAGE-"].update("word_temp.png")
       word_loaded = True
+    
+   if event == "-BOUND-SCALE-":
+        new_position = values["-BOUND-SCALE-"]/315
+        number = int(window["-BOUND-NUM-"].get())
+        boundrie_pair = ratio_boundries[number-1][1]
+        left, right = boundrie_pair
+        if mutable_boundrie == "left":
+            left = new_position
+        else:
+            right = new_position
+        new_boundrie = (left, right)
+        ratio_boundries[number-1] = (number, new_boundrie)
+
+        boundry_image = skimage.io.imread("borderdisplay.png")
+        draw_boundries(ratio_boundries, boundry_image)
+        skimage.io.imsave("bound_temp.png", boundry_image)
+        window["-IMAGE-BOUNDRIES-"].update("bound_temp.png")
 
    if event == "Skeletonize" and word_loaded is True:
       #Create Skeleton
@@ -347,6 +418,16 @@ while True:
       ratio_boundries = list()
       boundries = list(boundries.items())
 
+      for boundrie in boundries:
+        number, two_tuple = boundrie
+        left, right = two_tuple
+        width = scikit_skeleton.shape[1]
+        ratio_left = left/width
+        ratio_right = right/width
+        ratio_boundries.append((number, (ratio_left, ratio_right)))
+
+
+      #Remove smaller boundries from overlaps
       for shape_r in boundries:
         for shape_c in boundries:
             if shape_c[0] == shape_r[0]:
@@ -361,24 +442,11 @@ while True:
                     boundries.remove(shape_r)
                 else:
                     boundries.remove(shape_c)
+
       boundries = sorted(boundries, key=lambda tup: tup[1][0])
 
-      for first, second in zip(boundries, boundries[1:]):
-        first_shape = first[0]
-        second_shape = second[0]
-        left_bound = first[1][1]
-        right_bound = second[1][0]
-
-        width_of_skeleton = scikit_skeleton.shape[1]
-        space_bound = (left_bound + right_bound)/2 #Average
-        space_bound = space_bound/width_of_skeleton #Normalize
-
-        print(first_shape, second_shape, left_bound, right_bound, space_bound)
-        ratio_boundries.append(space_bound)
-
-      #Draw Boundry
       boundry_image = skimage.io.imread("borderdisplay.png")
-      draw_borders(boundry_image, ratio_boundries)
+      draw_boundries(ratio_boundries, boundry_image)
       skimage.io.imsave("bound_temp.png", boundry_image)
       window["-IMAGE-BOUNDRIES-"].update("bound_temp.png")
     
@@ -392,13 +460,36 @@ while True:
     if number > 1:
         window["-BOUND-NUM-"].update(number - 1)
 
+   if (event == "Previous" or event == "Next") and skeleton_created is True:
+        number = int(window["-BOUND-NUM-"].get())
+        if mutable_boundrie == "left":
+            position = ratio_boundries[number-1][1][0]
+        else:
+            position = ratio_boundries[number-1][1][1]
+
+        adjusted_position = math.ceil(position*315)
+        window["-BOUND-SCALE-"].update(adjusted_position)
+    
+   if event == "Modify Left Boundrie" and skeleton_created:
+    mutable_boundrie = "left"
+    number = int(window["-BOUND-NUM-"].get())
+    new_position = math.ceil(ratio_boundries[number-1][1][0]*315)
+    window["-BOUND-SCALE-"].update(new_position)
+
+   if event == "Modify Right Boundrie" and skeleton_created:
+    mutable_boundrie = "right"
+    number = int(window["-BOUND-NUM-"].get())
+    new_position = math.ceil(ratio_boundries[number-1][1][1]*315)
+    window["-BOUND-SCALE-"].update(new_position)
+
    if event == "Show Current" and skeleton_created is True:
         number = int(window["-BOUND-NUM-"].get())
         boundry_image = skimage.io.imread("borderdisplay.png")
-        draw_borders(boundry_image, [ratio_boundries[number-1]])
+        draw_boundries([ratio_boundries[number-1]], boundry_image)
         skimage.io.imsave("bound_temp.png", boundry_image)
         window["-IMAGE-BOUNDRIES-"].update("bound_temp.png")
-        window["-BOUND-SCALE-"].update(math.ceil(ratio_boundries[number-1]*315))
+        left = ratio_boundries[number-1][1][0]
+        window["-BOUND-SCALE-"].update(math.ceil(left*315))
 
    if event == "Insert After" and skeleton_created is True:
         number = int(window["-BOUND-NUM-"].get())
@@ -413,13 +504,44 @@ while True:
         skimage.io.imsave("bound_temp.png", boundry_image)
         window["-IMAGE-BOUNDRIES-"].update("bound_temp.png")
         window["-BOUND-SCALE-"].update(math.ceil(ratio_boundries[number-1]*315))
-        ratio_boundries = sorted(ratio_boundries)
+        aatio_boundries = sorted(ratio_boundries)
+    
+   if event == "Split Current":
+        number = int(window["-BOUND-NUM-"].get())
+        boundry_image = skimage.io.imread("borderdisplay.png")
+        left, right = ratio_boundries[number-1][1]
+        middle = (left+right)/2
+        length = right-left
+
+        left_boundrie = (left, middle-(length*0.05))
+        right_boundrie = (middle+(length*0.05), right)
+
+        for ratio in ratio_boundries[number:]:
+            number_=ratio[0]
+            ratio=(number_+1, ratio[1])
+
+        ratio_boundries[number-1] = (number, left_boundrie)
+        ratio_boundries.insert(number-1, (number, right_boundrie))
+
+
+        boundry_image = skimage.io.imread("borderdisplay.png")
+        draw_boundries(ratio_boundries, boundry_image)
+        skimage.io.imsave("bound_temp.png", boundry_image)
+        window["-IMAGE-BOUNDRIES-"].update("bound_temp.png")
+
 
    if event == "Show All" and skeleton_created is True:
         boundry_image = skimage.io.imread("borderdisplay.png")
         draw_borders(boundry_image, ratio_boundries)
         skimage.io.imsave("bound_temp.png", boundry_image)
         window["-IMAGE-BOUNDRIES-"].update("bound_temp.png")
+
+   if event == "Switch Image" and skeleton_created is True:
+        if is_display_skeleton is False:
+            window["-IMAGE-SKELETON-"].update("skeleton_temp.png")
+        else:
+            window["-IMAGE-SKELETON-"].update("word_temp.png")
+        is_display_skeleton = not is_display_skeleton
 
    if event == '-SL-':
       window['-TEXT-'].update(font=('Arial Bold', int(values['-SCALE-'])))
