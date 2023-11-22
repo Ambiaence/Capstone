@@ -1,3 +1,6 @@
+import os
+import copy
+import pickle
 import skimage
 import numpy
 import matplotlib.pyplot as plt
@@ -19,6 +22,13 @@ def get_ratio(image):
     
     return ratio
     
+def down_scale_to_8_by_8(letter_image):
+        letter_image=cut_image(letter_image)
+        letter_image = skimage.transform.resize(letter_image, (64,64), anti_aliasing=False)
+        letter_image = skimage.transform.resize(letter_image, (32,32), anti_aliasing=False)
+        letter_image = skimage.transform.resize(letter_image, (16,16), anti_aliasing=False)
+        letter_image = skimage.transform.resize(letter_image, (8,8), anti_aliasing=False)
+        return letter_image
 
 def cut_image(image): 
     cut_image = skimage.color.rgb2gray(image[:,:,:3])
@@ -46,7 +56,6 @@ def cut_image(image):
 letters = list()
 letter_images = list()
 
-
 position = ord("a")
 front_position = [1]
 
@@ -68,20 +77,46 @@ for letter in letters:
         letter_image = skimage.transform.resize(letter_image, (8,8), anti_aliasing=False)
         letter_images.append((letter, ratio, letter_image))
 
-data = list()
-for letter in letter_images:
-    character, ratio, image = letter
-    data.append((character, ratio, image.flatten()))
+    data = list()
+    for letter in letter_images:
+        character, ratio, image = letter
+        data.append((character, ratio, image.flatten()))
 
-x_data = list()
-y_data = list()
-for letter in data:
-    character, ratio, image = letter
-    x_data.append(image)
-    y_data.append(ord(character)-96)
-classifier = svm.SVC(gamma=0.001)
-classifier.fit(x_data,y_data)
+def classify(image):
+    if not os.path.exists("classifier.model"):
+        print("No trained model")
+        return None
 
-for letter in data:
-    character, ratio, image = letter
-    print(character, classifier.predict([image]))
+    cfile = open('classifier.model', 'rb')    
+    classifier = pickle.load(cfile)
+    image_mutable = copy.deepcopy(image)
+    image_mutable = image.flatten()
+    return classifier.predict([image_mutable])
+
+
+if os.path.exists("classifier.model"):
+    print("Model already exists")
+    cfile = open('classifier.model', 'rb')    
+    classifier = pickle.load(cfile)
+
+    for letter in data:
+        character, ratio, image = letter
+        print(character, classifier.predict([image]))
+else:
+
+    x_data = list()
+    y_data = list()
+    for letter in data:
+        character, ratio, image = letter
+        x_data.append(image)
+        y_data.append(ord(character)-96)
+    classifier = svm.SVC(gamma=0.001)
+    classifier.fit(x_data,y_data)
+
+    for letter in data:
+        character, ratio, image = letter
+        print(character, classifier.predict([image]))
+
+    cfile = open('classifier.model', 'ab')
+    pickle.dump(classifier, cfile)
+    cfile.close

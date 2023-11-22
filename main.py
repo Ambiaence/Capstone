@@ -7,6 +7,8 @@ from sklearn.cluster import KMeans
 from skimage.morphology import skeletonize
 from skimage.transform import rescale, resize, downscale_local_mean
 from skimage import data
+from down import classify
+from down import down_scale_to_8_by_8
 import skimage as ski
 import matplotlib.pyplot as plt
 from skimage.util import invert
@@ -33,6 +35,13 @@ def sliced_windowed_image(image, ratios):
     sliced_image = copy.deepcopy(image) 
     sliced_image = sliced_image[0:length, left:right ]  # Slice important part
     return sliced_image
+
+def draw_verticle_line(image, position):
+    width = image.shape[1]
+    height = math.floor(position*image.shape[0])
+    rr, cc = skimage.draw.line(height, 0, height, width-1)
+    image[rr, cc] = 0.5 
+    return image
 
 def windowed_image(image, window):
     r1 = window[0][0]
@@ -99,11 +108,11 @@ def return_normalize_display_image(image):
     return desired_image
 
 def return_normalize_display_letter_image(image):
-    desired_width = WIDTH
+    desired_height = 100
     image_width = image.shape[1]
     image_height = image.shape[0]
-    image_ratio = image_height/image_width
-    desired_height =  math.floor(image_ratio*desired_width)
+    image_ratio = image_width/image_height
+    desired_width =  math.floor(image_ratio*desired_height)
     desired_image = skimage.transform.resize(image, (desired_height, desired_width), anti_aliasing=True) 
     desired_image = skimage.util.img_as_ubyte(desired_image)
     return desired_image
@@ -283,7 +292,7 @@ tab_contents_parse_letters = [
 ]
 
 tab_contents_read_letters_row_one = [
-  psg.Slider(range=(10, 30), default_value=1,
+  psg.Slider(range=(1, 100), default_value=1,
    expand_x=True, enable_events=True,
    orientation='vertical', key='-SLIDER-PARSE-TOP-'),
 
@@ -571,7 +580,28 @@ while True:
             window["-IMAGE-SKELETON-"].update("word_temp.png")
         is_display_skeleton = not is_display_skeleton
 
+   if event == "Previous Letter" and skeleton_created is True:
+    downscaled_letter = copy.deepcopy(scikit_letter_image)
+
+    height = scikit_letter_image.shape[0]
+    width = scikit_letter_image.shape[0]
+
+    top = values["-SLIDER-PARSE-TOP-"]
+    bottom = values["-SLIDER-PARSE-BOTTOM-"]
+
+    top = (top-1)/100*-1
+    bottom = (bottom-1)/100*-1
+
+    top = math.floor(top*height)
+    bottom = math.floor(bottom*height)
+
+    downscaled_letter = downscaled_letter[top:bottom, 0:width]
+    downscaled_letter = down_scale_to_8_by_8(downscaled_letter)
+    print(classify(downscaled_letter))
+
    if event == "Next Letter" and skeleton_created is True:
+    top = values["-SLIDER-PARSE-TOP-"]
+    bottom = values["-SLIDER-PARSE-BOTTOM-"]
     number = int(window["-LETTER-NUM-"].get())
     shape, ratio = ratio_boundries[number-1]
     scikit_letter_image = sliced_windowed_image(scikit_image, ratio)
@@ -579,8 +609,17 @@ while True:
     skimage.io.imsave("letter_temp.png", scikit_letter_image)
     window["-LETTER-IMAGE-"].update("letter_temp.png")
 
+   if event == "-SLIDER-PARSE-TOP-" or event == "-SLIDER-PARSE-BOTTOM-":
+    top = values["-SLIDER-PARSE-TOP-"]
+    bottom = values["-SLIDER-PARSE-BOTTOM-"]
+    top = (top-1)/100*-1
+    bottom = (bottom-1)/100*-1
 
-
+    scikit_letter_image_copy = copy.deepcopy(scikit_letter_image)
+    draw_verticle_line(scikit_letter_image_copy, top)
+    draw_verticle_line(scikit_letter_image_copy, bottom)
+    skimage.io.imsave("letter_temp.png", scikit_letter_image_copy)
+    window["-LETTER-IMAGE-"].update("letter_temp.png")
 
    if event == '-SL-':
       window['-TEXT-'].update(font=('Arial Bold', int(values['-SCALE-'])))
