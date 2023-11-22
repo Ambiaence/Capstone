@@ -24,6 +24,16 @@ def show_image(image):
     skimage.io.imshow(image)
     plt.show()
 
+def sliced_windowed_image(image, ratios):
+    left, right = ratios # grab floating point values
+    length = image.shape[0]
+    width = image.shape[1]
+    left = math.floor(left*width)  #Scale
+    right = math.floor(right*width)  #Scale
+    sliced_image = copy.deepcopy(image) 
+    sliced_image = sliced_image[0:length, left:right ]  # Slice important part
+    return sliced_image
+
 def windowed_image(image, window):
     r1 = window[0][0]
     c1 = window[0][1]
@@ -79,6 +89,16 @@ def draw_borders(image, array_of_borders):
         image[rr, cc] = 34 
 
 def return_normalize_display_image(image):
+    desired_width = WIDTH
+    image_width = image.shape[1]
+    image_height = image.shape[0]
+    image_ratio = image_height/image_width
+    desired_height =  math.floor(image_ratio*desired_width)
+    desired_image = skimage.transform.resize(image, (desired_height, desired_width), anti_aliasing=True) 
+    desired_image = skimage.util.img_as_ubyte(desired_image)
+    return desired_image
+
+def return_normalize_display_letter_image(image):
     desired_width = WIDTH
     image_width = image.shape[1]
     image_height = image.shape[0]
@@ -230,17 +250,18 @@ tab_contents_grab_word = [
 
 ]
 
-parse_letters_next = psg.Button("Next") 
 parse_letters_previous = psg.Button("Previous") 
 parse_letters_insert = psg.Button("Insert After") 
+parse_letters_next = psg.Button("Next") 
+parse_letters_border_number = psg.Text(text='1', key ="-BOUND-NUM-")
 parse_letters_previous = psg.Button("Previous") 
 parse_letters_show_all = psg.Button("Show All") 
 parse_letters_show_all = psg.Button("Split Current") 
 parse_letters_move = psg.Button("Move To Slider") 
 parse_letters_show_current = psg.Button("Show Current") 
 parse_letters_image_flip = psg.Button("Switch Image")
-parse_letters_border_number = psg.Text(text='1', key ="-BOUND-NUM-")
 parse_letters_border_slider = psg.Slider(range=(1,315), default_value=1,
+
    expand_x=True, enable_events=True,
    orientation='horizontal', key='-BOUND-SCALE-')
 
@@ -258,15 +279,16 @@ tab_contents_parse_letters = [
    [parse_letters_border_slider],
    [psg.Button("Read Letter")],
    [parse_letters_previous, parse_letters_border_number, parse_letters_next, parse_letters_insert, parse_letters_show_all, parse_letters_image_flip, parse_letters_show_current, parse_letters_move]
+
 ]
 
 tab_contents_read_letters_row_one = [
-  psg.Slider(range=(10, 30), default_value=12,
+  psg.Slider(range=(10, 30), default_value=1,
    expand_x=True, enable_events=True,
    orientation='vertical', key='-SLIDER-PARSE-TOP-'),
 
    psg.Image('noletteryet.png',
-   expand_x=True,
+   expand_x=False,
    expand_y=True,
    key="-LETTER-IMAGE-"),
 
@@ -275,9 +297,15 @@ tab_contents_read_letters_row_one = [
    orientation='vertical', key='-SLIDER-PARSE-BOTTOM-'),
 ]
 
+tab_contents_read_letters_row_two = [
+    psg.Button("Next Letter"),
+    psg.Text(text='1', key ="-LETTER-NUM-"),
+    psg.Button("Previous Letter"),
+]
+
 tab_contents_read_letters = [
    tab_contents_read_letters_row_one,
-   [psg.Button("Modify Left Boundrie"), psg.Button("Modify Right Boundrie")]
+   tab_contents_read_letters_row_two,
 ]
 layout = [[
     psg.TabGroup([
@@ -542,6 +570,17 @@ while True:
         else:
             window["-IMAGE-SKELETON-"].update("word_temp.png")
         is_display_skeleton = not is_display_skeleton
+
+   if event == "Next Letter" and skeleton_created is True:
+    number = int(window["-LETTER-NUM-"].get())
+    shape, ratio = ratio_boundries[number-1]
+    scikit_letter_image = sliced_windowed_image(scikit_image, ratio)
+    scikit_letter_image = return_normalize_display_letter_image(scikit_letter_image)
+    skimage.io.imsave("letter_temp.png", scikit_letter_image)
+    window["-LETTER-IMAGE-"].update("letter_temp.png")
+
+
+
 
    if event == '-SL-':
       window['-TEXT-'].update(font=('Arial Bold', int(values['-SCALE-'])))
