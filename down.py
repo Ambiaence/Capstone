@@ -103,7 +103,6 @@ if os.path.exists("classifier.model"):
         character, ratio, image = letter
         print(character, classifier.predict([image]))
 else:
-
     x_data = list()
     y_data = list()
     for letter in data:

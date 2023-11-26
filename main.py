@@ -3,6 +3,7 @@ import imageio
 from sklearn.cluster import KMeans
 import numpy as np
 import copy
+import word
 from sklearn.cluster import KMeans
 from skimage.morphology import skeletonize
 from skimage.transform import rescale, resize, downscale_local_mean
@@ -21,6 +22,34 @@ import PySimpleGUI as psg
 from PIL import Image, ImageGrab
 
 WIDTH = 700 
+
+def refresh_letter_image(): 
+    global scikit_letter_image
+    top = values["-SLIDER-PARSE-TOP-"]
+    bottom = values["-SLIDER-PARSE-BOTTOM-"]
+    number = int(window["-LETTER-NUM-"].get())
+    shape, ratio = ratio_boundries[number-1]
+    scikit_letter_image = sliced_windowed_image(scikit_image, ratio)
+    scikit_letter_image = return_normalize_display_letter_image(scikit_letter_image)
+    skimage.io.imsave("letter_temp.png", scikit_letter_image)
+    window["-LETTER-IMAGE-"].update("letter_temp.png")
+
+def get_letter_number():
+    number = int(window["-LETTER-NUM-"].get())
+    return number
+
+def update_displayed_guess():
+    string = "WIP Word -> " + str(current_word.letters)
+    string = str(string)
+    window["-WORD-GUESS-"].update(string) 
+
+def extant_word():
+    global current_word
+    try:
+        current_word = current_word
+        return current_word
+    except:
+        return word.Word(len(ratio_boundries))
 
 def show_image(image):
     skimage.io.imshow(image)
@@ -56,8 +85,6 @@ def windowed_image(image, window):
     windowed_image[(rr, cc)] =  [50, 168, 113]
     return windowed_image
 
-    
-
 def does_segment_contain_point(segment, point):
     s1 = segment[0]
     s2 = segment[1]
@@ -73,13 +100,11 @@ def do_lines_intersect(line_one, line_two):
     b2 = line_two[1]
 
     does_contain = does_segment_contain_point
-
     if does_contain(line_one, b1) or does_contain(line_one, b2):
         return True
 
     if does_contain(line_two, a1) or does_contain(line_two, a2):
         return True
-    
     return False
 
 def draw_borders(image, array_of_borders):
@@ -146,9 +171,9 @@ def draw_boundries(boundires, image):
         try:
             left = math.floor(left*width)
             right = math.floor(right*width)
+            pairs.append((left,right))
         except:
             continue
-        pairs.append((left,right))
 
     for pair in pairs:
         left, right = pair
@@ -157,7 +182,7 @@ def draw_boundries(boundires, image):
         rr, cc = skimage.draw.line(0, right, height-1, right)
         image[rr, cc] = 34 
     
-        for middle in range(left+1, right-1):
+        for middle in range(left, right):
             rr, cc = skimage.draw.line(0, middle, height-1, middle)
             image[rr, cc] = 88  
 
@@ -256,7 +281,6 @@ tab_contents_grab_word = [
    size=20, expand_x=True,
    justification='center'),
    psg.Button("Skeletonize")],
-
 ]
 
 parse_letters_previous = psg.Button("Previous") 
@@ -265,8 +289,9 @@ parse_letters_next = psg.Button("Next")
 parse_letters_border_number = psg.Text(text='1', key ="-BOUND-NUM-")
 parse_letters_previous = psg.Button("Previous") 
 parse_letters_show_all = psg.Button("Show All") 
+parse_letters_delete_current = psg.Button("Delete Current") 
 parse_letters_show_all = psg.Button("Split Current") 
-parse_letters_move = psg.Button("Move To Slider") 
+parse_letters_move = psg.Button("Show All") 
 parse_letters_show_current = psg.Button("Show Current") 
 parse_letters_image_flip = psg.Button("Switch Image")
 parse_letters_border_slider = psg.Slider(range=(1,315), default_value=1,
@@ -286,8 +311,8 @@ tab_contents_parse_letters = [
    key="-IMAGE-BOUNDRIES-")],
 
    [parse_letters_border_slider],
-   [psg.Button("Read Letter")],
-   [parse_letters_previous, parse_letters_border_number, parse_letters_next, parse_letters_insert, parse_letters_show_all, parse_letters_image_flip, parse_letters_show_current, parse_letters_move]
+   [psg.Button("Read Letter"),psg.Button("Modify Left Boundrie") , psg.Button("Modify Right Boundrie")],
+   [parse_letters_previous, parse_letters_border_number, parse_letters_next,parse_letters_delete_current, parse_letters_insert, parse_letters_show_all, parse_letters_image_flip, parse_letters_show_current, parse_letters_move]
 
 ]
 
@@ -310,18 +335,26 @@ tab_contents_read_letters_row_two = [
     psg.Button("Next Letter"),
     psg.Text(text='1', key ="-LETTER-NUM-"),
     psg.Button("Previous Letter"),
+    psg.Button("Get Help"),
+    psg.Text(text='Full Guess', key ="-WORD-GUESS-"),
 ]
 
+tab_contents_read_letters_row_three = [
+    psg.Text(text='AI Guess: ', key ="-AI-GUESS-"),
+    psg.Button("Assign Letter"),
+    psg.Input('User Guess', enable_events=True, key='-USER-GUESS-', font=('Arial Bold', 20), justification='left'),
+]
 tab_contents_read_letters = [
    tab_contents_read_letters_row_one,
    tab_contents_read_letters_row_two,
+   tab_contents_read_letters_row_three,
 ]
 layout = [[
     psg.TabGroup([
         [psg.Tab("Grab Word", tab_contents_grab_word),
         psg.Tab("Borders", tab_contents_parse_letters),
-         psg.Tab("Read Letters", tab_contents_read_letters)]
-    ], key = "tabgroup")]
+         psg.Tab("Read Letters", tab_contents_read_letters, key = "Read Letters")]
+    ], key = "tabgroup", enable_events=True)]
 ]
       
 word_bytes = io.BytesIO()
@@ -368,11 +401,11 @@ while True:
             left = new_position
         else:
             right = new_position
+
         new_boundrie = (left, right)
         ratio_boundries[number-1] = (number, new_boundrie)
-
         boundry_image = skimage.io.imread("borderdisplay.png")
-        draw_boundries(ratio_boundries, boundry_image)
+        draw_boundries([ratio_boundries[number-1]], boundry_image)
         skimage.io.imsave("bound_temp.png", boundry_image)
         window["-IMAGE-BOUNDRIES-"].update("bound_temp.png")
 
@@ -447,13 +480,30 @@ while True:
                 plt.imsave("test.png", windowed_display_image)
                 window["-IMAGE-SKELETON-"].update("test.png")
                 breakpoint()
-            
              
       #Calculate boundries for windows
       boundries = get_boundries(shape_dictionary)
       skeleton_created = True
       ratio_boundries = list()
       boundries = list(boundries.items())
+      
+      #Remove smaller boundries from overlaps
+      for shape_r in boundries:
+        for shape_c in boundries:
+            
+            number_one, line_one = shape_r
+            number_two, line_two = shape_c
+
+            if number_one == number_two:
+                continue
+
+            if do_lines_intersect(line_one, line_two):
+                length_one = line_one[0] - line_one[1]
+                length_two = line_two[0] - line_two[1]
+                if (length_one > length_two):
+                    boundries.remove(shape_r)
+                else:
+                    boundries.remove(shape_c)
 
       for boundrie in boundries:
         number, two_tuple = boundrie
@@ -463,25 +513,8 @@ while True:
         ratio_right = right/width
         ratio_boundries.append((number, (ratio_left, ratio_right)))
 
-
-      #Remove smaller boundries from overlaps
-      for shape_r in boundries:
-        for shape_c in boundries:
-            if shape_c[0] == shape_r[0]:
-                continue
-            
-            line_one = shape_r[1]
-            line_two = shape_c[1]
-            if do_lines_intersect(line_one, line_two):
-                length_one = line_one[0] - line_one[1]
-                length_two = line_two[0] - line_two[1]
-                if (length_one < length_one):
-                    boundries.remove(shape_r)
-                else:
-                    boundries.remove(shape_c)
-
       boundries = sorted(boundries, key=lambda tup: tup[1][0])
-
+      ratio_boundries = sorted(ratio_boundries, key=lambda tup: tup[1][0])
       boundry_image = skimage.io.imread("borderdisplay.png")
       draw_boundries(ratio_boundries, boundry_image)
       skimage.io.imsave("bound_temp.png", boundry_image)
@@ -518,7 +551,7 @@ while True:
     number = int(window["-BOUND-NUM-"].get())
     new_position = math.ceil(ratio_boundries[number-1][1][1]*315)
     window["-BOUND-SCALE-"].update(new_position)
-
+   
    if event == "Show Current" and skeleton_created is True:
         number = int(window["-BOUND-NUM-"].get())
         boundry_image = skimage.io.imread("borderdisplay.png")
@@ -533,16 +566,12 @@ while True:
         ratio_boundries.insert(number, values["-BOUND-SCALE-"]/315)
         ratio_boundries = sorted(ratio_boundries)
 
-   if event == "Move To Slider" and skeleton_created is True:
-        number = int(window["-BOUND-NUM-"].get())
-        ratio_boundries[number-1] = values["-BOUND-SCALE-"]/315
+   if event == "Show All" and skeleton_created is True:
         boundry_image = skimage.io.imread("borderdisplay.png")
-        draw_borders(boundry_image, [ratio_boundries[number-1]])
+        draw_boundries(ratio_boundries, boundry_image)
         skimage.io.imsave("bound_temp.png", boundry_image)
         window["-IMAGE-BOUNDRIES-"].update("bound_temp.png")
-        window["-BOUND-SCALE-"].update(math.ceil(ratio_boundries[number-1]*315))
-        aatio_boundries = sorted(ratio_boundries)
-    
+
    if event == "Split Current":
         number = int(window["-BOUND-NUM-"].get())
         boundry_image = skimage.io.imread("borderdisplay.png")
@@ -550,8 +579,8 @@ while True:
         middle = (left+right)/2
         length = right-left
 
-        left_boundrie = (left, middle-(length*0.05))
-        right_boundrie = (middle+(length*0.05), right)
+        left_boundrie = (left, middle-(length*0.08))
+        right_boundrie = (middle+(length*0.08), right)
 
         for ratio in ratio_boundries[number:]:
             number_=ratio[0]
@@ -559,6 +588,7 @@ while True:
 
         ratio_boundries[number-1] = (number, left_boundrie)
         ratio_boundries.insert(number-1, (number, right_boundrie))
+        ratio_boundries = sorted(ratio_boundries, key=lambda tup: tup[1][0])
 
 
         boundry_image = skimage.io.imread("borderdisplay.png")
@@ -567,12 +597,6 @@ while True:
         window["-IMAGE-BOUNDRIES-"].update("bound_temp.png")
 
 
-   if event == "Show All" and skeleton_created is True:
-        boundry_image = skimage.io.imread("borderdisplay.png")
-        draw_borders(boundry_image, ratio_boundries)
-        skimage.io.imsave("bound_temp.png", boundry_image)
-        window["-IMAGE-BOUNDRIES-"].update("bound_temp.png")
-
    if event == "Switch Image" and skeleton_created is True:
         if is_display_skeleton is False:
             window["-IMAGE-SKELETON-"].update("skeleton_temp.png")
@@ -580,7 +604,7 @@ while True:
             window["-IMAGE-SKELETON-"].update("word_temp.png")
         is_display_skeleton = not is_display_skeleton
 
-   if event == "Previous Letter" and skeleton_created is True:
+   if event == "Get Help" and skeleton_created is True:
     downscaled_letter = copy.deepcopy(scikit_letter_image)
 
     height = scikit_letter_image.shape[0]
@@ -597,17 +621,37 @@ while True:
 
     downscaled_letter = downscaled_letter[top:bottom, 0:width]
     downscaled_letter = down_scale_to_8_by_8(downscaled_letter)
-    print(classify(downscaled_letter))
+    ai_guess = classify(downscaled_letter)[0] - 1
+    ai_guess = chr(ai_guess + ord("a"))
+    window["-AI-GUESS-"].update(ai_guess)
+    current_word = extant_word()
+    index = get_letter_number()-1
+    current_word.letters[index] = ai_guess
+    update_displayed_guess()
+
+   if event == "tabgroup" and skeleton_created:
+    refresh_letter_image()
+
+   if event == "Previous Letter" and skeleton_created is True:
+    number = get_letter_number()
+    if number > 1:
+        window["-LETTER-NUM-"].update(number-1)
+        refresh_letter_image()
 
    if event == "Next Letter" and skeleton_created is True:
-    top = values["-SLIDER-PARSE-TOP-"]
-    bottom = values["-SLIDER-PARSE-BOTTOM-"]
-    number = int(window["-LETTER-NUM-"].get())
-    shape, ratio = ratio_boundries[number-1]
-    scikit_letter_image = sliced_windowed_image(scikit_image, ratio)
-    scikit_letter_image = return_normalize_display_letter_image(scikit_letter_image)
-    skimage.io.imsave("letter_temp.png", scikit_letter_image)
-    window["-LETTER-IMAGE-"].update("letter_temp.png")
+    number = get_letter_number()
+    if number < len(ratio_boundries):
+        window["-LETTER-NUM-"].update(number+1)
+        refresh_letter_image()
+
+
+   if event == "Delete Current":
+    number = int(window["-BOUND-NUM-"].get())
+    boundry_image = skimage.io.imread("borderdisplay.png")
+    del ratio_boundries[number-1]
+    draw_boundries(ratio_boundries, boundry_image)
+    skimage.io.imsave("bound_temp.png", boundry_image)
+    window["-IMAGE-BOUNDRIES-"].update("bound_temp.png")
 
    if event == "-SLIDER-PARSE-TOP-" or event == "-SLIDER-PARSE-BOTTOM-":
     top = values["-SLIDER-PARSE-TOP-"]
@@ -619,6 +663,16 @@ while True:
     draw_verticle_line(scikit_letter_image_copy, top)
     draw_verticle_line(scikit_letter_image_copy, bottom)
     skimage.io.imsave("letter_temp.png", scikit_letter_image_copy)
+    window["-LETTER-IMAGE-"].update("letter_temp.png")
+
+   if event == "Assign Letter":
+    top = values["-SLIDER-PARSE-TOP-"]
+    bottom = values["-SLIDER-PARSE-BOTTOM-"]
+    number = int(window["-LETTER-NUM-"].get())
+    shape, ratio = ratio_boundries[number-1]
+    scikit_letter_image = sliced_windowed_image(scikit_image, ratio)
+    scikit_letter_image = return_normalize_display_letter_image(scikit_letter_image)
+    skimage.io.imsave("letter_temp.png", scikit_letter_image)
     window["-LETTER-IMAGE-"].update("letter_temp.png")
 
    if event == '-SL-':
