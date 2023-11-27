@@ -4,6 +4,7 @@ from sklearn.cluster import KMeans
 import numpy as np
 import copy
 import word
+from llm import spell_check
 from sklearn.cluster import KMeans
 from skimage.morphology import skeletonize
 from skimage.transform import rescale, resize, downscale_local_mean
@@ -349,11 +350,18 @@ tab_contents_read_letters = [
    tab_contents_read_letters_row_two,
    tab_contents_read_letters_row_three,
 ]
+
+tab_contents_spell_check = [[
+    psg.Button("Spell Check"),
+    psg.Text(text="5 Most Likely", key="-WORDS-")
+]]
+
 layout = [[
     psg.TabGroup([
         [psg.Tab("Grab Word", tab_contents_grab_word),
         psg.Tab("Borders", tab_contents_parse_letters),
-         psg.Tab("Read Letters", tab_contents_read_letters, key = "Read Letters")]
+         psg.Tab("Read Letters", tab_contents_read_letters, key = "Read Letters"),
+         psg.Tab("Spell Check", tab_contents_spell_check)]
     ], key = "tabgroup", enable_events=True)]
 ]
       
@@ -652,6 +660,13 @@ while True:
     draw_boundries(ratio_boundries, boundry_image)
     skimage.io.imsave("bound_temp.png", boundry_image)
     window["-IMAGE-BOUNDRIES-"].update("bound_temp.png")
+
+   if event == "Spell Check":
+    current_word = extant_word()
+    words = spell_check(str(current_word.letters))
+    output = "5 Most Likey words are \n" + words
+    window["-WORDS-"].update(output)
+
 
    if event == "-SLIDER-PARSE-TOP-" or event == "-SLIDER-PARSE-BOTTOM-":
     top = values["-SLIDER-PARSE-TOP-"]
