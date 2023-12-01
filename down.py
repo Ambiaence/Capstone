@@ -9,6 +9,26 @@ import math
 from sklearn import datasets, metrics, svm
 from sklearn.model_selection import train_test_split
 
+def get_8_by_8_connical_letters(letter):
+    images = list()
+    path1 = r"Training Set/font" + "1" + r"/" + letter  + r".png"
+    path2 = r"Training Set/font" + "2" + r"/" + letter  + r".png"
+    path3 = r"Training Set/font" + "3" + r"/" + letter  + r".png"
+
+    letter_image = skimage.io.imread(path1)
+    letter_image = down_scale_to_8_by_8_and_cut(letter_image)
+    images.append(letter_image)
+
+    letter_image = skimage.io.imread(path2)
+    letter_image = down_scale_to_8_by_8_and_cut(letter_image)
+    images.append(letter_image)
+
+    letter_image = skimage.io.imread(path3)
+    letter_image = down_scale_to_8_by_8_and_cut(letter_image)
+    images.append(letter_image)
+
+    return images
+
 def get_ratio(image):
     width = image.shape[1]
     height = image.shape[0]
@@ -21,9 +41,18 @@ def get_ratio(image):
         ratio = ratio - 1
     
     return ratio
+
     
-def down_scale_to_8_by_8(letter_image):
+def down_scale_to_8_by_8_and_cut(letter_image):
         letter_image=cut_image(letter_image)
+        letter_image = skimage.transform.resize(letter_image, (64,64), anti_aliasing=False)
+        letter_image = skimage.transform.resize(letter_image, (32,32), anti_aliasing=False)
+        letter_image = skimage.transform.resize(letter_image, (16,16), anti_aliasing=False)
+        letter_image = skimage.transform.resize(letter_image, (8,8), anti_aliasing=False)
+        return letter_image
+
+def down_scale_to_8_by_8(letter_image):
+        letter_image = skimage.color.rgb2gray(letter_image[:,:,:3])
         letter_image = skimage.transform.resize(letter_image, (64,64), anti_aliasing=False)
         letter_image = skimage.transform.resize(letter_image, (32,32), anti_aliasing=False)
         letter_image = skimage.transform.resize(letter_image, (16,16), anti_aliasing=False)

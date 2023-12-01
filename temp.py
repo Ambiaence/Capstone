@@ -1,0 +1,6 @@
+f = plt.figure()
+f.add_subplot(1,2, 1)
+plt.imshow(np.rot90(imgLr,2))
+f.add_subplot(1,2, 2)
+plt.imshow(np.rot90(imgRr,2))
+plt.show(block=True)

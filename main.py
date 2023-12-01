@@ -1,9 +1,13 @@
 import math
+import webbrowser
 import imageio
 from sklearn.cluster import KMeans
 import numpy as np
 import copy
 import word
+from word import open_dictionary
+
+from word import normailze_to_frequency
 from llm import spell_check
 from sklearn.cluster import KMeans
 from skimage.morphology import skeletonize
@@ -11,6 +15,7 @@ from skimage.transform import rescale, resize, downscale_local_mean
 from skimage import data
 from down import classify
 from down import down_scale_to_8_by_8
+from down import get_8_by_8_connical_letters
 import skimage as ski
 import matplotlib.pyplot as plt
 from skimage.util import invert
@@ -22,7 +27,22 @@ import io
 import PySimpleGUI as psg
 from PIL import Image, ImageGrab
 
+global frequency_lookup
+global rank_lookup 
+frequency_lookup = dict()
+rank_lookup = dict()
+open_dictionary(frequency_lookup, rank_lookup)
+
 WIDTH = 700 
+
+def sort_and_purge(boundries):
+    for index, boundrie in enumerate(boundries):
+        left, right = boundrie[1]
+        if left < 0 or left >= 1:
+            del boundries[index]
+        if right < 0 or right >= 1:
+            del boundries[index]
+    return sorted(boundries, key=lambda tup: tup[1][0])
 
 def refresh_letter_image(): 
     global scikit_letter_image
@@ -166,6 +186,7 @@ def draw_boundries(boundires, image):
 
     pairs = list()
 
+
     for boundrie in boundires:
         number, two_tuple = boundrie
         left, right = two_tuple
@@ -284,11 +305,9 @@ tab_contents_grab_word = [
    psg.Button("Skeletonize")],
 ]
 
-parse_letters_previous = psg.Button("Previous") 
-parse_letters_insert = psg.Button("Insert After") 
-parse_letters_next = psg.Button("Next") 
+parse_letters_previous = psg.Button("<-")
+parse_letters_next = psg.Button("->") 
 parse_letters_border_number = psg.Text(text='1', key ="-BOUND-NUM-")
-parse_letters_previous = psg.Button("Previous") 
 parse_letters_show_all = psg.Button("Show All") 
 parse_letters_delete_current = psg.Button("Delete Current") 
 parse_letters_show_all = psg.Button("Split Current") 
@@ -312,13 +331,13 @@ tab_contents_parse_letters = [
    key="-IMAGE-BOUNDRIES-")],
 
    [parse_letters_border_slider],
-   [psg.Button("Read Letter"),psg.Button("Modify Left Boundrie") , psg.Button("Modify Right Boundrie")],
-   [parse_letters_previous, parse_letters_border_number, parse_letters_next,parse_letters_delete_current, parse_letters_insert, parse_letters_show_all, parse_letters_image_flip, parse_letters_show_current, parse_letters_move]
+   [psg.Button("Read Letter"),psg.Button("Modify Left Boundrie") , psg.Button("Modify Right Boundrie"), parse_letters_previous, parse_letters_border_number,  parse_letters_next],
+   [parse_letters_delete_current, parse_letters_show_all, parse_letters_image_flip, parse_letters_show_current, parse_letters_move,]
 
 ]
 
 tab_contents_read_letters_row_one = [
-  psg.Slider(range=(1, 100), default_value=1,
+  psg.Slider(range=(1, 100), default_value=100,
    expand_x=True, enable_events=True,
    orientation='vertical', key='-SLIDER-PARSE-TOP-'),
 
@@ -327,7 +346,7 @@ tab_contents_read_letters_row_one = [
    expand_y=True,
    key="-LETTER-IMAGE-"),
 
-  psg.Slider(range=(1, 100), default_value=12,
+  psg.Slider(range=(1, 100), default_value=1,
    expand_x=True, enable_events=True,
    orientation='vertical', key='-SLIDER-PARSE-BOTTOM-'),
 ]
@@ -338,6 +357,8 @@ tab_contents_read_letters_row_two = [
     psg.Button("Previous Letter"),
     psg.Button("Get Help"),
     psg.Text(text='Full Guess', key ="-WORD-GUESS-"),
+    psg.Button("Get More Info"),
+    psg.Radio("Extra Info", "info_radio", key="-INFO-RADIO-"),
 ]
 
 tab_contents_read_letters_row_three = [
@@ -345,6 +366,7 @@ tab_contents_read_letters_row_three = [
     psg.Button("Assign Letter"),
     psg.Input('User Guess', enable_events=True, key='-USER-GUESS-', font=('Arial Bold', 20), justification='left'),
 ]
+
 tab_contents_read_letters = [
    tab_contents_read_letters_row_one,
    tab_contents_read_letters_row_two,
@@ -352,8 +374,9 @@ tab_contents_read_letters = [
 ]
 
 tab_contents_spell_check = [[
-    psg.Button("Spell Check"),
-    psg.Text(text="5 Most Likely", key="-WORDS-")
+    psg.Button("Frequency Information"),
+    psg.Button("AI Help"),
+    psg.Text(text="5 Likely Words", key="-WORDS-")
 ]]
 
 layout = [[
@@ -365,6 +388,8 @@ layout = [[
     ], key = "tabgroup", enable_events=True)]
 ]
       
+psg.theme('Material2')
+
 word_bytes = io.BytesIO()
 skeleton_bytes = io.BytesIO()
 shape_dictionary = dict()
@@ -373,7 +398,7 @@ mutable_boundrie = "left"
 word_loaded = False
 is_display_skeleton = True
 skeleton_created = False
-window = psg.Window('HelloWorld', layout, size=(715,WIDTH), keep_on_top=True)
+window = psg.Window('English Reading Buddy',  layout, size=(900,400), keep_on_top=True,font="Arial 12",)
 
 word_bytes = io.BytesIO()
 
@@ -522,23 +547,24 @@ while True:
         ratio_boundries.append((number, (ratio_left, ratio_right)))
 
       boundries = sorted(boundries, key=lambda tup: tup[1][0])
-      ratio_boundries = sorted(ratio_boundries, key=lambda tup: tup[1][0])
+      #ratio_boundries = sorted(ratio_boundries, key=lambda tup: tup[1][0])
+      ratio_boundries =sort_and_purge(ratio_boundries)
       boundry_image = skimage.io.imread("borderdisplay.png")
       draw_boundries(ratio_boundries, boundry_image)
       skimage.io.imsave("bound_temp.png", boundry_image)
       window["-IMAGE-BOUNDRIES-"].update("bound_temp.png")
     
-   if event == "Next" and skeleton_created is True:
+   if event == "->" and skeleton_created is True:
     number = int(window["-BOUND-NUM-"].get())
     if number < len(ratio_boundries):
         window["-BOUND-NUM-"].update(number + 1)
 
-   if event == "Previous" and skeleton_created is True:
+   if event == "<-" and skeleton_created is True:
     number = int(window["-BOUND-NUM-"].get())
     if number > 1:
         window["-BOUND-NUM-"].update(number - 1)
 
-   if (event == "Previous" or event == "Next") and skeleton_created is True:
+   if (event == "<-" or event == "->") and skeleton_created is True:
         number = int(window["-BOUND-NUM-"].get())
         if mutable_boundrie == "left":
             position = ratio_boundries[number-1][1][0]
@@ -568,11 +594,6 @@ while True:
         window["-IMAGE-BOUNDRIES-"].update("bound_temp.png")
         left = ratio_boundries[number-1][1][0]
         window["-BOUND-SCALE-"].update(math.ceil(left*315))
-
-   if event == "Insert After" and skeleton_created is True:
-        number = int(window["-BOUND-NUM-"].get())
-        ratio_boundries.insert(number, values["-BOUND-SCALE-"]/315)
-        ratio_boundries = sorted(ratio_boundries)
 
    if event == "Show All" and skeleton_created is True:
         boundry_image = skimage.io.imread("borderdisplay.png")
@@ -613,24 +634,45 @@ while True:
         is_display_skeleton = not is_display_skeleton
 
    if event == "Get Help" and skeleton_created is True:
-    downscaled_letter = copy.deepcopy(scikit_letter_image)
+    extra_info = values["-INFO-RADIO-"]
 
+    downscaled_letter = copy.deepcopy(scikit_letter_image)
     height = scikit_letter_image.shape[0]
     width = scikit_letter_image.shape[0]
 
     top = values["-SLIDER-PARSE-TOP-"]
     bottom = values["-SLIDER-PARSE-BOTTOM-"]
 
-    top = (top-1)/100*-1
-    bottom = (bottom-1)/100*-1
+    top = 1 - (top-1)/100
+    bottom = 1 -  (bottom-1)/100 
 
     top = math.floor(top*height)
     bottom = math.floor(bottom*height)
 
     downscaled_letter = downscaled_letter[top:bottom, 0:width]
     downscaled_letter = down_scale_to_8_by_8(downscaled_letter)
+
+
     ai_guess = classify(downscaled_letter)[0] - 1
     ai_guess = chr(ai_guess + ord("a"))
+
+    if extra_info is True:
+        fig = plt.figure(figsize=(10, 7)) 
+        rows = 1
+        columns = 4
+        images = get_8_by_8_connical_letters(ai_guess)
+        for index, image in enumerate(images):
+            fig.add_subplot(rows, columns, index+1)
+            plt.imshow(image)
+            plt.axis("off")
+            plt.title(str("Font #" + str(index+1)))
+
+        fig.add_subplot(rows, columns, 4)
+        plt.imshow(downscaled_letter)
+        plt.axis("off")
+        plt.title("Current Live Letter")
+        plt.show()
+
     window["-AI-GUESS-"].update(ai_guess)
     current_word = extant_word()
     index = get_letter_number()-1
@@ -661,7 +703,7 @@ while True:
     skimage.io.imsave("bound_temp.png", boundry_image)
     window["-IMAGE-BOUNDRIES-"].update("bound_temp.png")
 
-   if event == "Spell Check":
+   if event == "AI Help":
     current_word = extant_word()
     words = spell_check(str(current_word.letters))
     output = "5 Most Likey words are \n" + words
@@ -669,26 +711,67 @@ while True:
 
 
    if event == "-SLIDER-PARSE-TOP-" or event == "-SLIDER-PARSE-BOTTOM-":
-    top = values["-SLIDER-PARSE-TOP-"]
-    bottom = values["-SLIDER-PARSE-BOTTOM-"]
-    top = (top-1)/100*-1
-    bottom = (bottom-1)/100*-1
+        top = values["-SLIDER-PARSE-TOP-"]
+        bottom = values["-SLIDER-PARSE-BOTTOM-"]
 
-    scikit_letter_image_copy = copy.deepcopy(scikit_letter_image)
-    draw_verticle_line(scikit_letter_image_copy, top)
-    draw_verticle_line(scikit_letter_image_copy, bottom)
-    skimage.io.imsave("letter_temp.png", scikit_letter_image_copy)
-    window["-LETTER-IMAGE-"].update("letter_temp.png")
+        if top <= bottom:
+            top = bottom + 4 
+            if top >= 100:
+                top = 100
+                bottom = 1
+                window["-SLIDER-PARSE-TOP-"].update(top)
+                window["-SLIDER-PARSE-BOTTOM-"].update(bottom)
+            else:
+                window["-SLIDER-PARSE-TOP-"].update(top)
+
+        top = (top-1)/100*-1
+        bottom = (bottom-1)/100*-1
+        scikit_letter_image_copy = copy.deepcopy(scikit_letter_image)
+        draw_verticle_line(scikit_letter_image_copy, top)
+        draw_verticle_line(scikit_letter_image_copy, bottom)
+        skimage.io.imsave("letter_temp.png", scikit_letter_image_copy)
+        window["-LETTER-IMAGE-"].update("letter_temp.png")
 
    if event == "Assign Letter":
-    top = values["-SLIDER-PARSE-TOP-"]
-    bottom = values["-SLIDER-PARSE-BOTTOM-"]
+    current_word = extant_word()
     number = int(window["-LETTER-NUM-"].get())
-    shape, ratio = ratio_boundries[number-1]
-    scikit_letter_image = sliced_windowed_image(scikit_image, ratio)
-    scikit_letter_image = return_normalize_display_letter_image(scikit_letter_image)
-    skimage.io.imsave("letter_temp.png", scikit_letter_image)
-    window["-LETTER-IMAGE-"].update("letter_temp.png")
+    guess = values["-USER-GUESS-"]
+    if len(guess) == 1:
+        current_word.letters[number-1] = guess
+        update_displayed_guess()
+
+   if event == "Frequency Information":
+    debug_words = words 
+    #debug_words = "information frequency laugh info pants"
+    debug_words = debug_words.split()
+    displayed_words = list() 
+    bar_values = list()
+    fig = plt.figure(figsize = (20, 5))
+    plt.ylim(0,1)
+    for word_ in debug_words:
+        try:
+            displayed_words.append(str(word_ + "#: " + frequency_lookup[word_]))
+            bar_values.append(1 - normailze_to_frequency(rank_lookup[word_]))
+        except:
+            foo = foo
+    
+
+
+    plt.bar(displayed_words, bar_values, color ='maroon', width = 0.3)
+    plt.show()
+
+   if event == "Get More Info":
+    current_word = extant_word()
+    print(current_word.letters)
+
+    for letter in current_word.letters:
+        print(letter)
+        if letter == "?":
+            continue
+        webbrowser.open("https://en.wikipedia.org/wiki/" + letter)
+        print(letter)
+
+
 
    if event == '-SL-':
       window['-TEXT-'].update(font=('Arial Bold', int(values['-SCALE-'])))

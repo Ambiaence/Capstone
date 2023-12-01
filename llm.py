@@ -8,7 +8,7 @@ def spell_check(word):
     completion = client.chat.completions.create(
     model="gpt-3.5-turbo",
     messages=[
-        {"role": "system", "content": "You are a spell checker. You give 5 examples of what a given given word could be. Give distinct examples in order of likelihood."},
+        {"role": "system", "content": "You take a word, either spelled correctly or not, and give 5 examples of what a given given word could be. The examples should be distinct, lowercase, unlabeled, and seperated by space."},
         {"role": "user", "content": word}
     ]
     )
