@@ -287,7 +287,7 @@ tab_contents_grab_word = [
    justification='center'),
    psg.Button("Load Image")],
 
-   [psg.Radio("K-Mean Filter", "filter_radio", key="-K-MEAN-"), psg.Radio("No Filter", "filter_radio", key="-K-MEAN-")],
+   # [psg.Radio("K-Mean Filter", "filter_radio", key="-K-MEAN-"), psg.Radio("No Filter", "filter_radio", key="-K-MEAN-")],
 
    [psg.Slider(range=(1,3), default_value=1,
    expand_x=True, enable_events=True,
@@ -298,7 +298,7 @@ tab_contents_grab_word = [
    expand_y=True,
    key="-IMAGE-")],
 
-   [psg.Text(text='Skeletonize',
+   [psg.Text(text='Skeletonize ->',
    font=('Arial Bold', 16),
    size=20, expand_x=True,
    justification='center'),
@@ -315,7 +315,6 @@ parse_letters_move = psg.Button("Show All")
 parse_letters_show_current = psg.Button("Show Current") 
 parse_letters_image_flip = psg.Button("Switch Image")
 parse_letters_border_slider = psg.Slider(range=(1,315), default_value=1,
-
    expand_x=True, enable_events=True,
    orientation='horizontal', key='-BOUND-SCALE-')
 
@@ -352,9 +351,9 @@ tab_contents_read_letters_row_one = [
 ]
 
 tab_contents_read_letters_row_two = [
-    psg.Button("Next Letter"),
-    psg.Text(text='1', key ="-LETTER-NUM-"),
     psg.Button("Previous Letter"),
+    psg.Text(text='1', key ="-LETTER-NUM-"),
+    psg.Button("Next Letter"),
     psg.Button("Get Help"),
     psg.Text(text='Full Guess', key ="-WORD-GUESS-"),
     psg.Button("Get More Info"),
@@ -376,7 +375,7 @@ tab_contents_read_letters = [
 tab_contents_spell_check = [[
     psg.Button("Frequency Information"),
     psg.Button("AI Help"),
-    psg.Text(text="5 Likely Words", key="-WORDS-")
+    psg.Text(text="Suggested Words", key="-WORDS-")
 ]]
 
 layout = [[
@@ -388,7 +387,6 @@ layout = [[
     ], key = "tabgroup", enable_events=True)]
 ]
       
-psg.theme('Material2')
 
 word_bytes = io.BytesIO()
 skeleton_bytes = io.BytesIO()
@@ -398,7 +396,7 @@ mutable_boundrie = "left"
 word_loaded = False
 is_display_skeleton = True
 skeleton_created = False
-window = psg.Window('English Reading Buddy',  layout, size=(900,400), keep_on_top=True,font="Arial 12",)
+window = psg.Window('English Reading Buddy',  layout, size=(1200,600), keep_on_top=True,font="Arial 12",)
 
 word_bytes = io.BytesIO()
 
@@ -461,58 +459,59 @@ while True:
       shape_dictionary = dict()
       parse_shapes(scikit_skeleton, shape_dictionary)
 
-      if values["-K-MEAN-"] is True:
-        window_dictionary = dict()
-        area_dictionary = dict()
-        min_r = dict()
-        max_r = dict()
-        max_c = dict()
-        min_c = dict()
+    
+      #if values["-K-MEAN-"] is True:
+       # window_dictionary = dict()
+       # area_dictionary = dict()
+       # min_r = dict()
+       # max_r = dict()
+       # max_c = dict()
+       # min_c = dict()
 
-        for shape in set(shape_dictionary.values()):
-            min_r[shape] = float("inf") 
-            max_r[shape] = float("-inf")
-            min_c[shape] = float("inf")
-            max_c[shape] = float("-inf")
-        
-        for pixel, shape in shape_dictionary.items():
-            row = pixel[0]
-            column = pixel[1]
+       # for shape in set(shape_dictionary.values()):
+       #     min_r[shape] = float("inf") 
+       #     max_r[shape] = float("-inf")
+       #     min_c[shape] = float("inf")
+       #     max_c[shape] = float("-inf")
+       # 
+       # for pixel, shape in shape_dictionary.items():
+       #     row = pixel[0]
+       #     column = pixel[1]
 
-            min_r[shape] = min(row, min_r[shape])
-            max_r[shape] = max(row, max_r[shape])
+       #     min_r[shape] = min(row, min_r[shape])
+       #     max_r[shape] = max(row, max_r[shape])
 
-            min_c[shape] = min(column, min_c[shape])
-            max_c[shape] = max(column, max_c[shape])
-        
-        for shape in set(shape_dictionary.values()):
-            window_dictionary[shape] = ((min_r[shape], min_c[shape]), (max_r[shape], max_c[shape]))
-            area_dictionary[shape] = (abs(min_r[shape]-max_r[shape])*abs(max_c[shape]-max_r[shape]))
+       #     min_c[shape] = min(column, min_c[shape])
+       #     max_c[shape] = max(column, max_c[shape])
+       # 
+       # for shape in set(shape_dictionary.values()):
+       #     window_dictionary[shape] = ((min_r[shape], min_c[shape]), (max_r[shape], max_c[shape]))
+       #     area_dictionary[shape] = (abs(min_r[shape]-max_r[shape])*abs(max_c[shape]-max_r[shape]))
 
-        for shape in set(shape_dictionary.values()):
-            print(window_dictionary[shape])
-            print(area_dictionary[shape])
+       # for shape in set(shape_dictionary.values()):
+       #     print(window_dictionary[shape])
+       #     print(area_dictionary[shape])
 
-        temp_array = list()
+       # temp_array = list()
 
-        for row in area_dictionary.items():
-            print(row[0])
-            temp_array.append([row[1], 0])
+       # for row in area_dictionary.items():
+       #     print(row[0])
+       #     temp_array.append([row[1], 0])
 
-        X = np.array(temp_array)
-        kmeans = KMeans(n_clusters=2, random_state=10, n_init="auto").fit(X)
-        print(kmeans.labels_)
+       # X = np.array(temp_array)
+       # kmeans = KMeans(n_clusters=2, random_state=10, n_init="auto").fit(X)
+       # print(kmeans.labels_)
 
-        for shape, window_ in window_dictionary.items():
-            if kmeans.labels_[shape-1] == 1:
-                print(window_)
-                windowed_display_image = skimage.util.img_as_uint(scikit_skeleton)
-                windowed_display_image = skimage.color.gray2rgb(windowed_display_image)
-                windowed_display_image = windowed_image(windowed_display_image, window_) 
-                windowed_display_image = return_normalize_display_image_rgb(windowed_display_image) 
-                plt.imsave("test.png", windowed_display_image)
-                window["-IMAGE-SKELETON-"].update("test.png")
-                breakpoint()
+       # for shape, window_ in window_dictionary.items():
+       #     if kmeans.labels_[shape-1] == 1:
+       #         print(window_)
+       #         windowed_display_image = skimage.util.img_as_uint(scikit_skeleton)
+       #         windowed_display_image = skimage.color.gray2rgb(windowed_display_image)
+       #         windowed_display_image = windowed_image(windowed_display_image, window_) 
+       #         windowed_display_image = return_normalize_display_image_rgb(windowed_display_image) 
+       #         plt.imsave("test.png", windowed_display_image)
+       #         window["-IMAGE-SKELETON-"].update("test.png")
+       #         breakpoint()
              
       #Calculate boundries for windows
       boundries = get_boundries(shape_dictionary)
@@ -706,7 +705,7 @@ while True:
    if event == "AI Help":
     current_word = extant_word()
     words = spell_check(str(current_word.letters))
-    output = "5 Most Likey words are \n" + words
+    output = "Suggested Words are, [ \n" + words + "]"
     window["-WORDS-"].update(output)
 
 
@@ -757,6 +756,7 @@ while True:
     
 
 
+    plt.figtext(0.5, 0.01, "1 Is less frequent, 0 is most frequent. Scaled logorithmically. Format is -> Word # [Number Of Occurances In Data Set]", wrap=True, horizontalalignment='center', fontsize=12)
     plt.bar(displayed_words, bar_values, color ='maroon', width = 0.3)
     plt.show()
 
