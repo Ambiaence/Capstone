@@ -459,60 +459,6 @@ while True:
       shape_dictionary = dict()
       parse_shapes(scikit_skeleton, shape_dictionary)
 
-    
-      #if values["-K-MEAN-"] is True:
-       # window_dictionary = dict()
-       # area_dictionary = dict()
-       # min_r = dict()
-       # max_r = dict()
-       # max_c = dict()
-       # min_c = dict()
-
-       # for shape in set(shape_dictionary.values()):
-       #     min_r[shape] = float("inf") 
-       #     max_r[shape] = float("-inf")
-       #     min_c[shape] = float("inf")
-       #     max_c[shape] = float("-inf")
-       # 
-       # for pixel, shape in shape_dictionary.items():
-       #     row = pixel[0]
-       #     column = pixel[1]
-
-       #     min_r[shape] = min(row, min_r[shape])
-       #     max_r[shape] = max(row, max_r[shape])
-
-       #     min_c[shape] = min(column, min_c[shape])
-       #     max_c[shape] = max(column, max_c[shape])
-       # 
-       # for shape in set(shape_dictionary.values()):
-       #     window_dictionary[shape] = ((min_r[shape], min_c[shape]), (max_r[shape], max_c[shape]))
-       #     area_dictionary[shape] = (abs(min_r[shape]-max_r[shape])*abs(max_c[shape]-max_r[shape]))
-
-       # for shape in set(shape_dictionary.values()):
-       #     print(window_dictionary[shape])
-       #     print(area_dictionary[shape])
-
-       # temp_array = list()
-
-       # for row in area_dictionary.items():
-       #     print(row[0])
-       #     temp_array.append([row[1], 0])
-
-       # X = np.array(temp_array)
-       # kmeans = KMeans(n_clusters=2, random_state=10, n_init="auto").fit(X)
-       # print(kmeans.labels_)
-
-       # for shape, window_ in window_dictionary.items():
-       #     if kmeans.labels_[shape-1] == 1:
-       #         print(window_)
-       #         windowed_display_image = skimage.util.img_as_uint(scikit_skeleton)
-       #         windowed_display_image = skimage.color.gray2rgb(windowed_display_image)
-       #         windowed_display_image = windowed_image(windowed_display_image, window_) 
-       #         windowed_display_image = return_normalize_display_image_rgb(windowed_display_image) 
-       #         plt.imsave("test.png", windowed_display_image)
-       #         window["-IMAGE-SKELETON-"].update("test.png")
-       #         breakpoint()
-             
       #Calculate boundries for windows
       boundries = get_boundries(shape_dictionary)
       skeleton_created = True
@@ -770,8 +716,6 @@ while True:
             continue
         webbrowser.open("https://en.wikipedia.org/wiki/" + letter)
         print(letter)
-
-
 
    if event == '-SL-':
       window['-TEXT-'].update(font=('Arial Bold', int(values['-SCALE-'])))
